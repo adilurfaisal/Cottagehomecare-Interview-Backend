@@ -1,5 +1,7 @@
+import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import { connectDB } from "./config/db.js";
 import { errors } from "./middleware/errors.js";
 import {
   authRouter,
@@ -12,7 +14,7 @@ import {
 
 const app = express();
 app.disable("x-powered-by");
-// Render has one reverse proxy in front of the service.
+// Read the client IP forwarded by the hosting proxy.
 if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
 app.use(
   cors({ origin: process.env.FRONTEND_ORIGIN || "http://localhost:5173" }),
@@ -23,10 +25,22 @@ app.use((_req, res, next) => {
   res.set("Cache-Control", "no-store");
   next();
 });
+app.get("/", (_req, res) =>
+  res.json({
+    success: true,
+    data: { message: "Secure Notes API", health: "/api/health" },
+  }),
+);
 app.get("/api/health", (_req, res) =>
-
   res.json({ success: true, data: { status: "ok" } }),
 );
+
+// Vercel can load this app without running server.js.
+app.use("/api", async (_req, _res, next) => {
+  await connectDB();
+  next();
+});
+
 app.use("/api/auth", authRouter);
 app.use("/api/admin/users", usersRouter);
 app.use("/api/interests", interestsRouter);
